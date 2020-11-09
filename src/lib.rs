@@ -75,10 +75,19 @@ pub use crossbeam_channel::TrySendError;
 ///
 /// ```
 #[derive(Debug)]
-#[cfg_attr(feature = "crossbeam", derive(Clone))]
 pub struct Channel<S, R> {
     sender: Sender<S>,
     receiver: Receiver<R>,
+}
+
+#[cfg(feature = "crossbeam")]
+impl<S, R> Clone for Channel<S, R> {
+    fn clone(&self) -> Self {
+        Channel {
+            sender: self.sender.clone(),
+            receiver: self.receiver.clone(),
+        }
+    }
 }
 
 impl<S, R> Channel<S, R> {
