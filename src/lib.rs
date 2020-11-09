@@ -1,5 +1,9 @@
-//! A zero dependency `std::sync::mpsc` based bidirectional channel. Each side can send
-//! and receive with its counterpart
+//! Zero dependency `std::sync` based bidirectional channels. Each side can send
+//! and receive with its counterpart.
+//!
+//! Note, the default `Channel` inherits `!Sync` from `std::sync::mpsc::Receiver`. If you
+//! would prefer, a `crossbeam` implementation is available by enabling the `crossbeam` flag. In
+//! addition to its desirable performance characteristics, it also drops this `!Sync` constraint.
 //!
 //! ## Getting Started
 //!
@@ -31,9 +35,31 @@
 //! NOTE: This README uses [cargo-readme](https://github.com/livioribeiro/cargo-readme). To
 //! update the README, use `cargo readme > README.md`
 
-use std::sync::mpsc;
+#[cfg(not(feature = "crossbeam"))]
+use std::sync::mpsc::{channel as create_channel, Receiver, Sender};
 
-/// One side of a bichannelrectional channel. This channel can send to and receive from its
+#[cfg(not(feature = "crossbeam"))]
+pub use std::sync::mpsc::RecvError;
+#[cfg(not(feature = "crossbeam"))]
+pub use std::sync::mpsc::SendError;
+#[cfg(not(feature = "crossbeam"))]
+pub use std::sync::mpsc::TryRecvError;
+#[cfg(not(feature = "crossbeam"))]
+pub use std::sync::mpsc::TrySendError;
+
+#[cfg(feature = "crossbeam")]
+use crossbeam_channel::{unbounded as create_channel, Receiver, Sender};
+
+#[cfg(feature = "crossbeam")]
+pub use crossbeam_channel::RecvError;
+#[cfg(feature = "crossbeam")]
+pub use crossbeam_channel::SendError;
+#[cfg(feature = "crossbeam")]
+pub use crossbeam_channel::TryRecvError;
+#[cfg(feature = "crossbeam")]
+pub use crossbeam_channel::TrySendError;
+
+/// One side of a bidirectional channel. This channel can send to and receive from its
 /// counterpart.
 ///
 /// # Examples
@@ -49,8 +75,8 @@ use std::sync::mpsc;
 ///
 /// ```
 pub struct Channel<S, R> {
-    sender: mpsc::Sender<S>,
-    receiver: mpsc::Receiver<R>,
+    sender: Sender<S>,
+    receiver: Receiver<R>,
 }
 
 impl<S, R> Channel<S, R> {
@@ -82,7 +108,7 @@ impl<S, R> Channel<S, R> {
     /// drop(l);
     /// assert_eq!(r.send(1).unwrap_err().0, 1);
     /// ```
-    pub fn send(&self, s: S) -> Result<(), mpsc::SendError<S>> {
+    pub fn send(&self, s: S) -> Result<(), SendError<S>> {
         self.sender.send(s)
     }
 
@@ -138,7 +164,7 @@ impl<S, R> Channel<S, R> {
     /// assert_eq!(Ok(3), recv.recv());
     /// assert_eq!(Err(RecvError), recv.recv());
     /// ```
-    pub fn recv(&self) -> Result<R, mpsc::RecvError> {
+    pub fn recv(&self) -> Result<R, RecvError> {
         self.receiver.recv()
     }
 
@@ -166,7 +192,7 @@ impl<S, R> Channel<S, R> {
     ///
     /// assert!(right.try_recv().is_err());
     /// ```
-    pub fn try_recv(&self) -> Result<R, mpsc::TryRecvError> {
+    pub fn try_recv(&self) -> Result<R, TryRecvError> {
         self.receiver.try_recv()
     }
 }
@@ -184,8 +210,8 @@ impl<S, R> Channel<S, R> {
 /// assert_eq!(right.recv().unwrap(), "ping");
 /// ```
 pub fn channel<T, U>() -> (Channel<T, U>, Channel<U, T>) {
-    let (ls, lr) = mpsc::channel();
-    let (rs, rr) = mpsc::channel();
+    let (ls, lr) = create_channel();
+    let (rs, rr) = create_channel();
 
     (
         Channel {
@@ -209,7 +235,7 @@ mod examples {
         let handle = std::thread::spawn(move || loop {
             match main.try_recv() {
                 Ok("stop") => break "stopped",
-                Err(std::sync::mpsc::TryRecvError::Empty) => (),
+                Err(crate::TryRecvError::Empty) => (),
                 _ => main.send("cant stop").unwrap(),
             }
         });
