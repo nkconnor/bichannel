@@ -74,6 +74,8 @@ pub use crossbeam_channel::TrySendError;
 /// assert_eq!(Ok(1), l.recv());
 ///
 /// ```
+#[derive(Debug)]
+#[cfg_attr(feature = "crossbeam", derive(Clone))]
 pub struct Channel<S, R> {
     sender: Sender<S>,
     receiver: Receiver<R>,
